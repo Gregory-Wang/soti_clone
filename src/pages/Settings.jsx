@@ -4,6 +4,9 @@ import mqtt from 'mqtt';
 const Settings = () => {
 
     let client;
+    let clientId;
+    let topic;
+
 
     // 打印测试用例
     const printSample = `
@@ -17,92 +20,104 @@ const Settings = () => {
         if (logElement) {
             logElement.textContent += `${new Date().toLocaleTimeString()}: ${message}\n`;
             logElement.scrollTop = logElement.scrollHeight; // 滚动到最新日志
+            console.log('test', message);
+        }
+    };
+
+    // 处理表单提交
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        const broker = document.getElementById('broker1').value;
+        const port = document.getElementById('port1').value;
+        clientId = document.getElementById('clientId1').value;
+        topic = document.getElementById('topic1').value;
+        const url = `ws://${broker}:${port}/mqtt`;
+
+        
+
+        // 如果之前有连接，先断开
+        if (client) {
+            client.end();
+        }
+        client = mqtt.connect(url, {
+            clientId: clientId,
+        });
+
+        //连接成功
+        client.on('connect',() => {
+            log(`✅ 连接成功: ${url}`);
+            document.getElementById('status1').textContent = '已连接';
+            document.getElementById('controls1').style.display = 'flex';
+            document.getElementById('connectControl').disabled = true;
+            document.getElementById('connectControl').textContent = '已连接';
+        })
+
+        // 连接失败
+        client.on('error', (err) => {
+            log(`❌ 连接失败: ${err.message}`);
+            client.end();
+            document.getElementById('status1').textContent = '连接失败';
+            document.getElementById('controls1').style.display = 'none';
+            document.getElementById('connectControl').disabled = false;
+            document.getElementById('connectControl').textContent = '连接';
+        });
+    };
+
+    // 处理断开连接
+    const handleDisconnect = () => {
+        if (client) {
+            client.end();
+            log('🔌 已断开连接');
+            document.getElementById('status1').textContent = '未连接';
+            document.getElementById('controls1').style.display = 'none';
+            document.getElementById('connectControl').disabled = false;
+            document.getElementById('connectControl').textContent = '连接';
+        }
+    };
+
+    // 处理打印命令
+    const handlePrint = () => {
+        if (client && client.connected) {
+            // Task ID
+            const taskId = clientId + Math.random().toString(16).slice(2, 10);
+
+            const messageObj = {
+                taskId: taskId,
+                content: printSample
+            };
+            client.publish(topic, JSON.stringify(messageObj), { qos: 1 }, (err) => {
+                if (err) {
+                    log(`❌ 发送打印命令失败: ${err.message}`);
+                } else {
+                    log(`✅ 打印命令已发送: ${JSON.stringify(messageObj)}`);
+                }
+            });
+        } else {
+            log('❌ 无法发送打印命令，未连接到 Broker');
         }
     };
 
     React.useEffect(() => {
         const form = document.getElementById('control-form');
+        const disconnectBtn = document.getElementById('disconnectBtn1');
+        const printBtn = document.getElementById('printBtn');
+
+        // 只绑定一次
         if (form) {
-            form.addEventListener('submit', function(e){
-                e.preventDefault();
-                const broker = document.getElementById('broker1').value;
-                const port = document.getElementById('port1').value;
-                const clientId = document.getElementById('clientId1').value;
-                const topic = document.getElementById('topic1').value;
-                const url = `ws://${broker}:${port}/mqtt`;
-
-                // Task ID
-                const taskId = clientId + Math.random().toString(16).slice(2, 10);
-
-                // 如果之前有连接，先断开
-                if (client) {
-                    client.end();
-                }
-                client = mqtt.connect(url, {
-                    clientId: clientId,
-                });
-
-                //连接成功
-                client.on('connect',() => {
-                    log(`✅ 连接成功: ${url}`);
-                    document.getElementById('status1').textContent = '已连接';
-                    document.getElementById('controls1').style.display = 'flex';
-                    document.getElementById('connectControl').disabled = true;
-                    document.getElementById('connectControl').textContent = '已连接';
-                })
-
-                // 连接失败
-                client.on('error', (err) => {
-                    log(`❌ 连接失败: ${err.message}`);
-                    client.end();
-                    document.getElementById('status1').textContent = '连接失败';
-                    document.getElementById('controls1').style.display = 'none';
-                    document.getElementById('connectControl').disabled = false;
-                    document.getElementById('connectControl').textContent = '连接';
-                });
-
-                // 断开连接
-                document.getElementById('disconnectBtn1').addEventListener('click', () => {
-                    if (client) {
-                        client.end();
-                        log('🔌 已断开连接');
-                        document.getElementById('status1').textContent = '未连接';
-                        document.getElementById('controls1').style.display = 'none';
-                        document.getElementById('connectControl').disabled = false;
-                        document.getElementById('connectControl').textContent = '连接';
-                    }
-                });
-
-                // 发送打印命令
-                document.getElementById('printBtn').addEventListener('click', () => {
-                    if (client && client.connected) {
-                        const messageObj = {
-                            taskId: taskId,
-                            content: printSample
-                        };
-                        client.publish(topic, JSON.stringify(messageObj), { qos: 1 }, (err) => {
-                            if (err) {
-                                log(`❌ 发送打印命令失败: ${err.message}`);
-                            } else {
-                                log(`✅ 打印命令已发送: ${JSON.stringify(messageObj)}`);
-                            }
-                        });
-                    } else {
-                        log('❌ 无法发送打印命令，未连接到 Broker');
-                    }
-                });
-
-
-
-
-
-            })
+            form.addEventListener('submit', handleSubmit);
         }
-        // Cleanup
+        if (disconnectBtn) {
+            disconnectBtn.addEventListener('click', handleDisconnect);
+        }
+        if (printBtn) {
+            printBtn.addEventListener('click', handlePrint);
+        }
+
+        // 清理
         return () => {
-            if (form) {
-                form.removeEventListener('submit', () => {});
-            }
+            if (form) form.removeEventListener('submit', handleSubmit);
+            if (disconnectBtn) disconnectBtn.removeEventListener('click', handleDisconnect);
+            if (printBtn) printBtn.removeEventListener('click', handlePrint);
         };
     }, []);
 
