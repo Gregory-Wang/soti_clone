@@ -1,49 +1,113 @@
-import React from 'react'
+import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react'
 import DeviceList from "@/components/ui/DeviceList.jsx";
-import { useState } from "react";
+import DeviceDetail from "@/components/ui/DeviceDetail.jsx";
+import { useModal, ModalTrigger } from "@/components/ui/ModalManager.jsx";
+import { useLanguage } from '@/hooks/useLanguage.js';
 
+const DeviceManagement = React.memo(() => {
+    const { t } = useLanguage();
+    const { registerRefreshCallback } = useModal();
+    const deviceListRef = useRef(null);
+    const [selectedDevice, setSelectedDevice] = useState(null);
+    const [isTransitioning, setIsTransitioning] = useState(false);
 
-const DeviceManagement = () => {
-  return (
+    // Create a stable refresh function reference
+    const refreshFunction = useCallback(() => {
+        if (deviceListRef.current) {
+            return deviceListRef.current();
+        }
+    }, []);
+
+    // Register refresh callback - only register once when component mounts
+    useEffect(() => {
+        registerRefreshCallback(refreshFunction);
+    }, [registerRefreshCallback, refreshFunction]);
+
+    const handleAddDevice = useCallback(() => {
+        // This feature is now handled by ModalTrigger
+    }, []);
+
+    const handleSyncDevices = useCallback(() => {
+        // Refresh device list
+        if (deviceListRef.current) {
+            deviceListRef.current();
+        }
+    }, []);   
+
+    // Handle device selection
+    const handleDeviceSelect = useCallback((device) => {
+        setIsTransitioning(true);
+        
+        // Use setTimeout to ensure fadeout animation completes before switching page
+        setTimeout(() => {
+            setSelectedDevice(device);
+            setIsTransitioning(false);
+        }, 300); // 300ms is the duration of the CSS transition
+    }, []);
+
+    // Handle return to device list
+    const handleBackToList = useCallback(() => {
+        setIsTransitioning(true);
+        
+        // Use setTimeout to ensure fadeout animation completes before switching page
+        setTimeout(() => {
+            setSelectedDevice(null);
+            setIsTransitioning(false);
+        }, 300);
+    }, []);
+
+    // Use useMemo to optimize button rendering
+    const actionButtons = useMemo(() => (
+        <div className="flex space-x-3">
+            <ModalTrigger modalType="addPrinter">
+                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
+                    <i className="fas fa-plus mr-2"></i>{t('addDevice')}
+                </button>
+            </ModalTrigger>
+            <button 
+                onClick={handleSyncDevices}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+            >
+                <i className="fas fa-sync mr-2"></i>{t('syncDevices')}
+            </button>
+        </div>
+    ), [handleSyncDevices, t]);
+
+    return (
         <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">设备管理</h2>
-                
-                <div className="flex flex-wrap gap-4 mb-6">
-                    <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                        <i className="fas fa-plus mr-2"></i>添加设备
-                    </button>
-                    <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
-                        <i className="fas fa-download mr-2"></i>批量导入
-                    </button>
-                    <button className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">
-                        <i className="fas fa-sync mr-2"></i>同步设备
-                    </button>
+            {/* Page title and action buttons - only shown on device list page */}
+            {!selectedDevice && (
+                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">{t('deviceManagement')}</h1>
+                            <p className="text-gray-600 mt-1">{t('deviceManagementDescription')}</p>
+                        </div>
+                        {actionButtons}
+                    </div>
                 </div>
+            )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                        <h3 className="font-semibold text-blue-800">设备发现</h3>
-                        <p className="text-sm text-blue-600">自动发现网络中的新设备</p>
-                    </div>
-                    <div className="bg-green-50 p-4 rounded-lg">
-                        <h3 className="font-semibold text-green-800">配置管理</h3>
-                        <p className="text-sm text-green-600">统一管理设备配置策略</p>
-                    </div>
-                    <div className="bg-purple-50 p-4 rounded-lg">
-                        <h3 className="font-semibold text-purple-800">组织结构</h3>
-                        <p className="text-sm text-purple-600">按组织架构管理设备</p>
-                    </div>
-                    <div className="bg-orange-50 p-4 rounded-lg">
-                        <h3 className="font-semibold text-orange-800">生命周期</h3>
-                        <p className="text-sm text-orange-600">完整的设备生命周期管理</p>
-                    </div>
-                </div>
+            {/* Content area */}
+            <div className={`transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+                {selectedDevice ? (
+                    <DeviceDetail 
+                        device={selectedDevice} 
+                        onBack={handleBackToList}
+                    />
+                ) : (
+                    <DeviceList 
+                        onRefresh={(refreshFunction) => {
+                            deviceListRef.current = refreshFunction;
+                        }}
+                        onDeviceSelect={handleDeviceSelect}
+                    />
+                )}
             </div>
-            
-            <DeviceList />
         </div>
     );
-}
+});
+
+DeviceManagement.displayName = 'DeviceManagement';
 
 export default DeviceManagement

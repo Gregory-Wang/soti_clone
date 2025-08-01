@@ -1,8 +1,10 @@
 import React from 'react'
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
+import { useLanguage } from '@/hooks/useLanguage.js';
 
-const DeviceStatusChart = () => {
+const DeviceStatusChart = ({ stats = { online: 0, offline: 0, warning: 0 } }) => {
+    const { t } = useLanguage();
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
 
@@ -14,12 +16,15 @@ const DeviceStatusChart = () => {
                 chartInstance.current.destroy();
             }
 
+            // Use the passed stats data
+            const chartData = [stats.online || 0, stats.offline || 0, stats.warning || 0];
+
             chartInstance.current = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['在线', '离线', '警告'],
+                    labels: [t('online'), t('offline'), t('warning')],
                     datasets: [{
-                        data: [142, 14, 8],
+                        data: chartData,
                         backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
                         borderWidth: 0
                     }]
@@ -45,13 +50,28 @@ const DeviceStatusChart = () => {
                 chartInstance.current.destroy();
             }
         };
-    }, []);
+            }, [stats, t]); // Add t as dependency
 
     return (
-        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">设备状态分布</h3>
-            <div className="chart-container">
-                <canvas ref={chartRef}></canvas>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden h-full flex flex-col">
+            {/* Header */}
+            <div className="px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-green-50 to-blue-50 flex-shrink-0">
+                <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-green-100 rounded-lg">
+                        <i className="fas fa-chart-pie text-green-600 text-sm"></i>
+                    </div>
+                    <div>
+                        <h3 className="text-sm font-semibold text-gray-800">{t('deviceStatusDistribution')}</h3>
+                        <p className="text-xs text-gray-500">{t('deviceStatusOverview')}</p>
+                    </div>
+                </div>
+            </div>
+            
+            {/* Chart area */}
+            <div className="p-4 flex-1">
+                <div className="chart-container h-full">
+                    <canvas ref={chartRef} className="w-full h-full"></canvas>
+                </div>
             </div>
         </div>
     );
